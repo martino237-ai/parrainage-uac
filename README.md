@@ -35,8 +35,8 @@ cd ../backend && npm start   -> http://localhost:4000
 
 ## Hébergement gratuit
 - **Base** : Aiven for MySQL (plan gratuit). Importer `database/schema.sql`. Variables : `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL=true`.
-- **Backend** : Render (Web Service, racine `backend`, build `npm install`, start `npm start`). Variables : celles de `.env.example`, avec `FRONT_URL` = adresse du site Vercel. Le plan gratuit s'endort après 15 min : ouvrez `/api/health` 2 minutes avant la cérémonie, ou ajoutez un ping UptimeRobot.
-- **Frontend** : Vercel (racine `frontend`). Variable : `VITE_API_URL` = adresse du backend Render.
+- **Backend** : Render (Web Service, racine `backend`, build `npm install`, start `npm start`). Variables : celles de `.env.example`, avec `FRONT_URL` et `CORS_ORIGIN` = adresse du site Netlify/Vercel. Le plan gratuit s'endort après 15 min : ouvrez `/api/health` 2 minutes avant la cérémonie, ou ajoutez un ping UptimeRobot.
+- **Frontend** : Netlify (répertoire `frontend`, build `npm install && npm run build`, publish `dist`). Variable : `VITE_API_URL` = adresse du backend Render.
 - Créer l'admin une fois : `npm run seed-admin` depuis votre PC avec le `.env` pointant vers Aiven.
 
 ## Déroulement

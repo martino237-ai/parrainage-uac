@@ -73,9 +73,21 @@ button.big { padding: .9rem 1.4rem; font-size: 1.02rem; }
 .steps { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0; }
 .step { padding: .32rem .7rem; border: 1px solid rgba(17, 61, 51, .12); border-radius: 999px; font-size: .8rem; color: var(--gris); background: rgba(255,255,255,.6); }
 .step.cur { background: linear-gradient(135deg, var(--gold), #efdb9d); border-color: transparent; color: var(--nuit); font-weight: 700; }
+.phase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .65rem; margin-top: 1rem; }
+.phase-button { display: flex; align-items: center; gap: .7rem; justify-content: flex-start; padding: .8rem .85rem; border-radius: 12px; border: 1px solid rgba(17, 61, 51, .08); background: rgba(255,255,255,.65); color: var(--nuit); }
+.phase-button span { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: rgba(18, 61, 52, .08); font-size: .74rem; font-weight: 700; }
+.phase-button-active { background: linear-gradient(135deg, rgba(233, 198, 125, .18), rgba(17, 61, 51, .08)); border-color: rgba(233, 198, 125, .36); box-shadow: inset 0 0 0 1px rgba(173, 139, 60, .28); }
 .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: .75rem 0; }
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
 .row { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; background: rgba(255,255,255,.87); border: 1px solid rgba(17,61,51,.08); border-radius: 16px; padding: .75rem; margin-bottom: .5rem; box-shadow: 0 12px 18px rgba(16,30,25,.03); }
+.herbergement-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.herbergement-card { position: relative; padding: 1rem; border-radius: 18px; background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(245,247,240,.96)); border: 1px solid rgba(17,61,51,.07); box-shadow: 0 14px 28px rgba(17, 36, 29, .05); }
+.herbergement-badge { display: inline-flex; align-items: center; padding: .28rem .55rem; border-radius: 999px; background: rgba(53, 143, 108, .12); color: #1d745f; font-size: .63rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.herbergement-badge.warn { background: rgba(209, 134, 54, .12); color: #a56018; }
+.herbergement-badge.info { background: rgba(102, 135, 214, .12); color: #3a60b6; }
+.herbergement-card h3 { margin: .7rem 0 .25rem; color: var(--nuit); font-size: .96rem; }
+.herbergement-card strong { color: var(--forest); font-size: 1.4rem; }
+.herbergement-list { margin: 0; padding-left: 1rem; display: grid; gap: .45rem; color: var(--gris); }
 .row img { width: 52px; height: 62px; object-fit: cover; border-radius: 10px; background: var(--trait); }
 .grow { flex: 1 1 200px; min-width: 0; }
 .tag { font-size: .78rem; padding: .2rem .55rem; border-radius: 999px; background: rgba(126, 150, 92, .1); border: 1px solid rgba(126,150,92,.2); }
@@ -110,6 +122,18 @@ details { margin-top: 1.5rem; } .printonly { display: none; }
   display: grid; gap: 1rem;
   align-items: stretch;
 }
+.projection-waiting {
+  grid-column: 1 / -1;
+  margin-top: .5rem;
+  padding: .65rem 1rem;
+  border: 1px solid rgba(233, 198, 125, .35);
+  border-radius: 999px;
+  background: rgba(233, 198, 125, .08);
+  color: #f3e5c1;
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 .pcard { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 1.5vh; animation: reveal .9s cubic-bezier(.2, .7, .2, 1) both; }
 .pcard img, .pcard .ph {
   width: min(34vw, 440px); max-width: 440px; aspect-ratio: 3/4; object-fit: cover; border-radius: 28px; background: linear-gradient(135deg, #2a4f43, #101f1c);
@@ -125,7 +149,12 @@ details { margin-top: 1.5rem; } .printonly { display: none; }
 .stage footer { color: #d1dacd; font-size: clamp(.9rem, 1.4vw, 1.2rem); }
 @keyframes reveal { from { opacity: 0; transform: scale(.94) translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
-@media (max-width: 700px) { .duo { grid-template-columns: 1fr; gap: 1rem; } .thread { height: 24px; transform: rotate(90deg); width: 60px; margin: 0 auto; } .pcard img, .pcard .ph { width: min(68vw, 320px); } }
+@media (max-width: 700px) {
+  .duo { grid-template-columns: 1fr; gap: 1rem; }
+  .thread { height: 24px; transform: rotate(90deg); width: 60px; margin: 0 auto; }
+  .pcard img, .pcard .ph { width: min(68vw, 320px); }
+  .projection-waiting { font-size: .68rem; letter-spacing: .06em; }
+}
 @media (prefers-reduced-motion: reduce) { .pcard { animation: none; } .thread path { animation: none; stroke-dashoffset: 0; } }
 
 /* Student enrollment landing page */
@@ -178,6 +207,13 @@ details { margin-top: 1.5rem; } .printonly { display: none; }
 .enroll-steps p { display: grid; gap: .18rem; margin: 0; }
 .enroll-steps strong { color: #fff; font-size: .75rem; }
 .enroll-steps small { color: #d5ded3; font-size: .67rem; line-height: 1.45; }
+.enroll-highlights { width: min(100%, 540px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-top: 1.3rem; }
+.enroll-highlight-item { display: flex; flex-direction: column; gap: .35rem; padding: .9rem .8rem; border: 1px solid rgba(255,255,255,.15); border-radius: 16px; background: rgba(255,255,255,.07); backdrop-filter: blur(6px); }
+.enroll-highlight-badge { display: inline-flex; align-self: flex-start; padding: .25rem .45rem; border-radius: 999px; background: rgba(211, 235, 126, .15); color: #d9ed9a; font-size: .54rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.enroll-highlight-badge.alt { background: rgba(228, 180, 98, .15); color: #f1d48c; }
+.enroll-highlight-badge.soft { background: rgba(171, 201, 255, .14); color: #bfd7ff; }
+.enroll-highlight-item strong { color: #fff; font-size: .78rem; }
+.enroll-highlight-item small { color: #d5ddd6; font-size: .62rem; line-height: 1.5; }
 .enroll-panel { align-self: start; width: 100%; padding: clamp(1.35rem, 3vw, 2.35rem); border: 1px solid #eeefe9; border-radius: 24px; background: #fff; box-shadow: 0 22px 65px #273c2b12, 0 3px 12px #273c2b05; }
 .enroll-panel-heading { margin-bottom: 1.4rem; }
 .enroll-panel-kicker { color: #8c9d4b; font-size: .63rem; font-weight: 800; letter-spacing: .14em; }

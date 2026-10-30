@@ -9,7 +9,7 @@ const { ensureSchema } = require('./migrate');
 const PORT = process.env.PORT || 4000;
 const SECRET = process.env.JWT_SECRET;
 if (!SECRET || SECRET.length < 16) { console.error('JWT_SECRET manquant ou trop court (16 caractères min.)'); process.exit(1); }
-const FRONT = (process.env.FRONT_URL || 'http://localhost:5173').split(',').map(s => s.trim());
+const FRONT = [...new Set([...(process.env.FRONT_URL || 'http://localhost:5173').split(',').map(s => s.trim()).filter(Boolean), ...(process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean)])];
 const PHASES = ['inscriptions', 'closes', 'pointage', 'ceremonie', 'termine'];
 const NIVEAUX = ['L1', 'L2', 'L3', 'M1', 'M2'];
 const rank = n => NIVEAUX.indexOf(n);
@@ -20,9 +20,16 @@ const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
 const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: FRONT } });
+const isAllowedOrigin = origin => {
+  if (!origin) return true;
+  if (FRONT.includes(origin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  if (/^https:\/\/.*\.(netlify\.app|vercel\.app)$/i.test(origin)) return true;
+  return false;
+};
+const io = new Server(server, { cors: { origin: (origin, callback) => callback(null, isAllowedOrigin(origin)) } });
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
-app.use(cors({ origin: FRONT }));
+app.use(cors({ origin: (origin, callback) => callback(null, isAllowedOrigin(origin)), credentials: true }));
 app.use(express.json({ limit: '50kb' }));
 
 const limitLogin = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Trop de tentatives, réessayez dans 15 minutes' } });
@@ -62,8 +69,8 @@ async function getCouples(c, statut) {
     WHERE k.statut = ? ORDER BY k.id DESC`, [statut]);
   return rows.map(r => ({
     id: r.id, statut: r.statut, validated_at: r.validated_at,
-    parrain: { id: r.pid, nom: r.pnom, filiere: r.pfil, niveau: r.pniv },
-    filleul: { id: r.fid, nom: r.fnom, filiere: r.ffil, niveau: r.fniv }
+    parrain: { id: r.pid, nom: r.pnom, filiere: r.pfil, niveau: r.pniv, role: 'parrain' },
+    filleul: { id: r.fid, nom: r.fnom, filiere: r.ffil, niveau: r.fniv, role: 'filleul' }
   }));
 }
 
@@ -199,8 +206,11 @@ app.post('/api/admin/login', limitLogin, wrap(async (req, res) => {
 }));
 
 app.get('/api/admin/stats', auth, wrap(async (q, res) => {
-  const [r] = await pool.query(`SELECT role, COUNT(*) total, SUM(dossier='valide') valides,
-    SUM(dossier='en_attente') attente, SUM(dossier='valide' AND present=1) presents FROM participants GROUP BY role`);
+  const [r] = await pool.query(`SELECT role, COUNT(*) total,
+    SUM(CASE WHEN dossier = 'valide' THEN 1 ELSE 0 END) valides,
+    SUM(CASE WHEN dossier = 'en_attente' THEN 1 ELSE 0 END) attente,
+    SUM(CASE WHEN dossier = 'valide' AND present = 1 THEN 1 ELSE 0 END) presents
+    FROM participants GROUP BY role`);
   const out = { parrain: { total: 0, valides: 0, attente: 0, presents: 0 }, filleul: { total: 0, valides: 0, attente: 0, presents: 0 } };
   r.forEach(x => { out[x.role] = { total: +x.total, valides: +x.valides, attente: +x.attente, presents: +x.presents }; });
   out.couples = (await pool.query('SELECT COUNT(*) n FROM couples'))[0][0].n;
@@ -234,9 +244,9 @@ app.put('/api/admin/campagne', auth, wrap(async (req, res) => {
     if (regles.some(k => d[k] !== undefined && Number(d[k]) !== Number(camp[k])) && ['ceremonie', 'termine'].includes(camp.phase))
       throw new HttpError(409, 'Les règles ne changent plus à partir de la cérémonie');
     if (d.phase && d.phase !== camp.phase) {
-      if (PHASES.indexOf(d.phase) !== PHASES.indexOf(camp.phase) + 1)
-        throw new HttpError(409, 'La campagne avance uniquement vers la phase suivante');
-      if (camp.phase === 'ceremonie' && (await enAttente(c) || await propositionSuspendue(c)))
+      const from = PHASES.indexOf(camp.phase);
+      const to = PHASES.indexOf(d.phase);
+      if (to > from && camp.phase === 'ceremonie' && (await enAttente(c) || await propositionSuspendue(c)))
         throw new HttpError(409, 'Terminez ou reprenez la proposition en cours avant de changer de phase');
       if (d.phase === 'ceremonie') {
         const [rows] = await c.query("SELECT role, COUNT(*) n FROM participants WHERE dossier = 'valide' AND present = 1 GROUP BY role");
@@ -282,7 +292,7 @@ app.patch('/api/admin/participants/:id/dossier', auth, wrap(async (req, res) => 
   await tx(async c => {
     if (['pointage', 'ceremonie', 'termine'].includes((await getCampagne(c)).phase)) throw new HttpError(409, 'La validation des dossiers est terminée');
     if (await dejaCouple(c, id)) throw new HttpError(409, 'Cette personne est déjà dans un couple');
-    const [r] = await c.query(`UPDATE participants SET dossier = ?, motif_rejet = ?, present = IF(? = 'valide', present, 0)
+    const [r] = await c.query(`UPDATE participants SET dossier = ?, motif_rejet = ?, present = CASE WHEN ? = 'valide' THEN present ELSE 0 END
       WHERE id = ?`, [p.data.dossier, p.data.dossier === 'rejete' ? p.data.motif : null, p.data.dossier, id]);
     if (!r.affectedRows) throw new HttpError(404, 'Introuvable');
     await audit(c, req.admin.id, 'participant.dossier.' + p.data.dossier, 'participant', id,

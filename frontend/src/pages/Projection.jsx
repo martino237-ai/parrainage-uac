@@ -35,6 +35,8 @@ function getProjectionPair(c) {
 
 export default function Projection() {
   const [e, setE] = useState(null);
+  const [showParrain, setShowParrain] = useState(false);
+
   useEffect(() => {
     const load = () => api('/api/projection').then(setE).catch(() => {});
     load();
@@ -48,6 +50,16 @@ export default function Projection() {
   const pair = c ? getProjectionPair(c) : null;
   const valide = !!e && !e.propose && !!e.dernier;
 
+  useEffect(() => {
+    setShowParrain(false);
+    if (!pair) return;
+    const timer = setTimeout(() => setShowParrain(true), 20000);
+    return () => clearTimeout(timer);
+  }, [pair && pair.left[0]?.id, pair && pair.right[0]?.id, pair && pair.leftLabel, pair && pair.rightLabel]);
+
+  const filleuls = pair ? [...(pair.left.filter(p => p.role === 'filleul')), ...(pair.right.filter(p => p.role === 'filleul'))] : [];
+  const parrains = pair ? [...(pair.left.filter(p => p.role === 'parrain')), ...(pair.right.filter(p => p.role === 'parrain'))] : [];
+
   return (
     <main className="stage">
       <h1>Parrainage {e ? e.annee : ''}</h1>
@@ -55,14 +67,19 @@ export default function Projection() {
         <>
           <div className="duo">
             <div className="projection-stack">
-              {pair.left.map((p, idx) => <Person key={'left-' + (p.id || idx)} p={p} label={pair.leftLabel} />)}
+              {filleuls.map((p, idx) => <Person key={'filleul-' + (p.id || idx)} p={p} label="Filleul" />)}
             </div>
-            <svg className="thread" viewBox="0 0 120 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 10 C30 0, 90 20, 120 10" /></svg>
-            <div className="projection-stack">
-              {pair.right.map((p, idx) => <Person key={'right-' + (p.id || idx)} p={p} label={pair.rightLabel} />)}
-            </div>
+            {showParrain && (
+              <>
+                <svg className="thread" viewBox="0 0 120 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 10 C30 0, 90 20, 120 10" /></svg>
+                <div className="projection-stack">
+                  {parrains.map((p, idx) => <Person key={'parrain-' + (p.id || idx)} p={p} label="Parrain" />)}
+                </div>
+              </>
+            )}
+            {!showParrain && filleuls.length > 0 && <div className="projection-waiting">Le parrain arrive dans 20 secondes…</div>}
           </div>
-          <p className={'state' + (valide ? ' ok' : '')}>{valide ? 'Couple validé' : 'Nouveau couple'}</p>
+          <p className={'state' + (valide ? ' ok' : '')}>{valide ? 'Couple validé' : showParrain ? 'Nouveau couple' : 'Présentation du filleul'}</p>
         </>
       ) : (
         <p className="wait">{e?.suspendu ? 'Le prochain couple arrive bientôt' : e && e.phase === 'ceremonie' ? 'Le prochain couple arrive' : 'La cérémonie va commencer'}</p>

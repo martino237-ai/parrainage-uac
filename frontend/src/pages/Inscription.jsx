@@ -194,6 +194,24 @@ export default function Inscription() {
               <div><span>01</span><p><strong>Inscrivez-vous</strong><small>Votre dossier en quelques minutes</small></p></div>
               <div><span>02</span><p><strong>Rencontrez votre binôme</strong><small>Le comité prépare la cérémonie</small></p></div>
             </div>
+
+            <div className="enroll-highlights" aria-label="Points d’attention du parrainage">
+              <div className="enroll-highlight-item">
+                <span className="enroll-highlight-badge">Accueil</span>
+                <strong>Parrainage structuré</strong>
+                <small>Une expérience organisée, claire et respectueuse.</small>
+              </div>
+              <div className="enroll-highlight-item">
+                <span className="enroll-highlight-badge alt">Hébergement</span>
+                <strong>Logement préparé</strong>
+                <small>Les chambres et le suivi sont déjà pensés pour l’accueil.</small>
+              </div>
+              <div className="enroll-highlight-item">
+                <span className="enroll-highlight-badge soft">Logistique</span>
+                <strong>Suivi professionnel</strong>
+                <small>Chaque étape est pensée pour éviter le stress et faciliter l’intégration.</small>
+              </div>
+            </div>
           </div>
 
           <section className="enroll-panel" aria-labelledby="enroll-title">

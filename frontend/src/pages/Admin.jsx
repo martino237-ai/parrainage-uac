@@ -63,7 +63,7 @@ function Panel({ sortir }) {
   };
 
   if (!camp || !stats) return <main className="page"><p>{msg || 'Chargement…'}</p></main>;
-  const Tab = { dash: Dash, parts: Parts, tirage: Tirage, couples: Couples, journal: Journal }[tab];
+  const Tab = { dash: Dash, parts: Parts, tirage: Tirage, couples: Couples, journal: Journal, heb: Hebergement }[tab];
   return (
     <main className="page wide">
       <header className="bar">
@@ -72,7 +72,7 @@ function Panel({ sortir }) {
         <button className="ghost" onClick={sortir}>Se déconnecter</button>
       </header>
       <nav className="tabs">
-        {[['dash', 'Tableau de bord'], ['parts', 'Inscrits'], ['tirage', 'Tirage'], ['couples', 'Couples'], ['journal', 'Journal d’audit']].map(([k, l]) => (
+        {[['dash', 'Tableau de bord'], ['parts', 'Inscrits'], ['tirage', 'Tirage'], ['couples', 'Couples'], ['heb', 'Hébergement'], ['journal', 'Journal d’audit']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setMsg(''); setTab(k); }}>{l}</button>
         ))}
       </nav>
@@ -87,9 +87,13 @@ function Dash({ camp, stats, run }) {
   const verrou = i >= 3;
   const set = b => run(() => api('/api/admin/campagne', { method: 'PUT', body: b }));
   const aller = j => {
-    if (!window.confirm(`Passer de « ${PHL[camp.phase]} » à « ${PHL[PH[j]]} » ?`)) return;
+    if (j === i) return;
+    const nextLabel = PHL[PH[j]];
+    const direction = j < i ? 'revenir à' : 'passer à';
+    if (!window.confirm(`Voulez-vous ${direction} « ${nextLabel} » ?`)) return;
     set({ phase: PH[j] });
   };
+
   return (
     <section>
       <div className="grid2">
@@ -104,13 +108,19 @@ function Dash({ camp, stats, run }) {
       <div className="card">
         <h2>Activation des étapes du parrainage</h2>
         <p className="steps">{PH.map((p, idx) => <span key={p} className={'step' + (idx === i ? ' cur' : '') + (idx < i ? ' done' : '')}>{PHL[p]}</span>)}</p>
-        <p className="hint">Le comité active les étapes dans l’ordre. Cela permet d’ouvrir les inscriptions, de fermer le dépôt, de lancer le pointage, puis la cérémonie.</p>
-        <div className="actions">
-          {i < PH.length - 1 ? (
-            <button className="pri" onClick={() => aller(i + 1)}>Activer la phase : {PHL[PH[i + 1]]}</button>
-          ) : (
-            <button className="pri" disabled>Parrainage terminé</button>
-          )}
+        <p className="hint">Le comité peut avancer ou revenir sur une étape selon le besoin. Les règles restent sûres, et la cérémonie ne peut pas être ouverte sans parrains et filleuls présents.</p>
+        <div className="phase-grid">
+          {PH.map((p, idx) => (
+            <button
+              key={p}
+              type="button"
+              className={'phase-button ' + (idx === i ? 'phase-button-active' : '')}
+              onClick={() => aller(idx)}
+            >
+              <span>{idx + 1}</span>
+              {PHL[p]}
+            </button>
+          ))}
         </div>
       </div>
       <div className="card">
@@ -125,6 +135,43 @@ function Dash({ camp, stats, run }) {
         <label className="chk"><input type="checkbox" disabled={verrou} checked={!!camp.meme_filiere} onChange={e => set({ meme_filiere: e.target.checked })} />Le parrain et le filleul sont de la même filière</label>
       </div>
       <p>Couples formés : <strong>{stats.couples}</strong></p>
+    </section>
+  );
+}
+
+function Hebergement() {
+  const stays = [
+    { title: 'Chambres principales', count: '36 lits', status: 'Disponible', accent: 'ok' },
+    { title: 'Accueil VIP / cas spéciaux', count: '8 places', status: 'À confirmer', accent: 'warn' },
+    { title: 'Accueil femmes / hommes', count: '2 ailes', status: 'Préparé', accent: 'ok' },
+    { title: 'Restaurant & petit-déjeuner', count: '2 services', status: 'Planifié', accent: 'info' }
+  ];
+
+  const tasks = [
+    'Vérifier la liste des arrivants et leur sexe',
+    'Préparer les cartons d’accueil et les clés',
+    'Contrôler les besoins alimentaires et cas particuliers',
+    'Finaliser la planification des chambres et des espaces communs'
+  ];
+
+  return (
+    <section>
+      <div className="herbergement-grid">
+        {stays.map(item => (
+          <div key={item.title} className="herbergement-card">
+            <span className={`herbergement-badge ${item.accent}`}>{item.status}</span>
+            <h3>{item.title}</h3>
+            <strong>{item.count}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <h2>Plan d’hébergement prêt à finaliser</h2>
+        <ul className="herbergement-list">
+          {tasks.map(task => <li key={task}>{task}</li>)}
+        </ul>
+      </div>
     </section>
   );
 }
