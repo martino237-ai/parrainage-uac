@@ -30,12 +30,20 @@ if (usePostgres) {
     throw new Error('DATABASE_URL or SUPABASE_DB_URL is required when DB_DRIVER=postgres.');
   }
 
+  const isSupabaseUrl = /supabase\.com|pooler\.supabase\.com/i.test(connectionString);
+  const shouldUseSsl = process.env.DB_SSL === 'true' || process.env.PGSSL === 'true' || isSupabaseUrl;
+
   const pool = new Pool({
     connectionString,
-    ssl: process.env.DB_SSL === 'true' || process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : false,
+    ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000
+  });
+
+  pool.on('error', (err) => {
+    console.error('Erreur PostgreSQL / Supabase :', err.message);
+    console.error('Vérifiez DATABASE_URL dans backend/.env. Copiez la chaîne exacte de Supabase > Database > Connection string.');
   });
 
   module.exports = {

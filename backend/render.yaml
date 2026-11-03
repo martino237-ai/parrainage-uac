@@ -5,25 +5,21 @@ services:
     plan: free
     region: oregon
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DB_DRIVER
+        value: postgres
+      - key: PGSSL
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
       - key: FRONT_URL
-        value: https://serene-squirrel-debcfc.netlify.app
+        value: https://parrainage-uac-2026.netlify.app
       - key: CORS_ORIGIN
-        value: https://serene-squirrel-debcfc.netlify.app
-      - key: DB_HOST
-        value: localhost
-      - key: DB_PORT
-        value: 3306
-      - key: DB_USER
-        value: root
-      - key: DB_PASSWORD
-        value: ""
-      - key: DB_NAME
-        value: parrainage_uac
-      - key: DB_SSL
-        value: "false"
+        value: https://parrainage-uac-2026.netlify.app
+      - key: DATABASE_URL
+        value: postgresql://postgres.zgexazuwcbafjblcinql:parrainage-uac@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+      # Sur Render + Node Postgres, le pooler Supabase fonctionne bien sans sslmode=require.
+      # Le driver accepte la connexion avec SSL actif, et le code ignore les certificats auto-signés.

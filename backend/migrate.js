@@ -27,6 +27,58 @@ async function ensureSchema() {
   const isPg = !!(process.env.DB_DRIVER === 'postgres' || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL);
 
   if (isPg) {
+    await pool.query(`CREATE TABLE IF NOT EXISTS campagne (
+      id SMALLINT PRIMARY KEY,
+      annee VARCHAR(9) NOT NULL,
+      phase VARCHAR(20) NOT NULL DEFAULT 'inscriptions' CHECK (phase IN ('inscriptions','closes','pointage','ceremonie','termine')),
+      capacite_parrain SMALLINT NOT NULL DEFAULT 1 CHECK (capacite_parrain BETWEEN 1 AND 5),
+      meme_filiere BOOLEAN NOT NULL DEFAULT false,
+      niveau_superieur BOOLEAN NOT NULL DEFAULT true
+    )`);
+    await pool.query(`INSERT INTO campagne (id, annee, phase, capacite_parrain, meme_filiere, niveau_superieur)
+      VALUES (1, '2026-2027', 'inscriptions', 1, false, true)
+      ON CONFLICT (id) DO NOTHING`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS admins (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(40) NOT NULL UNIQUE,
+      password_hash VARCHAR(100) NOT NULL
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS participants (
+      id SERIAL PRIMARY KEY,
+      role VARCHAR(10) NOT NULL CHECK (role IN ('parrain', 'filleul')),
+      nom VARCHAR(80) NOT NULL,
+      matricule VARCHAR(20) NOT NULL UNIQUE,
+      filiere VARCHAR(80) NOT NULL,
+      niveau VARCHAR(10) NOT NULL CHECK (niveau IN ('L1','L2','L3','M1','M2')),
+      telephone VARCHAR(20) NOT NULL,
+      photo BYTEA NOT NULL,
+      photo_mime VARCHAR(20) NOT NULL,
+      dossier VARCHAR(20) NOT NULL DEFAULT 'en_attente' CHECK (dossier IN ('en_attente', 'valide', 'rejete')),
+      motif_rejet VARCHAR(500),
+      present BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS couples (
+      id SERIAL PRIMARY KEY,
+      parrain_id INT NOT NULL REFERENCES participants(id),
+      filleul_id INT NOT NULL UNIQUE REFERENCES participants(id),
+      statut VARCHAR(20) NOT NULL DEFAULT 'propose' CHECK (statut IN ('propose', 'suspendu', 'valide')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      validated_at TIMESTAMPTZ NULL
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS tirages_log (
+      id SERIAL PRIMARY KEY,
+      action VARCHAR(30) NOT NULL,
+      parrain_id INT NULL,
+      filleul_id INT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
     await ensureColumn('participants', 'motif_rejet', 'VARCHAR(500)');
     await ensureColumn('participants', 'updated_at', 'TIMESTAMPTZ NOT NULL DEFAULT NOW()');
     await pool.query(`CREATE TABLE IF NOT EXISTS audit_log (

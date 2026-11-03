@@ -3,28 +3,43 @@
 Application web : inscription des parrains et filleuls, pointage, tirage de couples avec photos sur grand écran, remplacement de l'absent.
 
 ## Lancer en local (Windows, Mac, Linux)
-Prérequis : Node.js 18+ et MySQL 8+.
+Prérequis : Node.js 18+ et PostgreSQL 14+ / Supabase.
 
 1. **Base de données**
-   ```
-   mysql -u root -p -e "CREATE DATABASE parrainage_uac CHARACTER SET utf8mb4"
-   mysql -u root -p parrainage_uac < database/schema.sql
-   ```
+   - Localement, la base cible est PostgreSQL.
+   - Avec Supabase, utilisez la chaîne “Connection string” ou le pooler partagé IPv4 si votre hébergeur est en IPv4.
+   - La connexion directe Supabase utilise souvent IPv6 par défaut, ce qui peut échouer sur Render.
 2. **Backend**
    ```
    cd backend
-   cp .env.example .env      (puis modifier JWT_SECRET, DB_PASSWORD, ADMIN_USER, ADMIN_PASSWORD)
    npm install
    npm run migrate
    npm run seed-admin
    npm start
    ```
+   Variables requises dans `.env` : `JWT_SECRET`, `DB_DRIVER=postgres`, `DATABASE_URL`, `PGSSL=true`, `ADMIN_USER`, `ADMIN_PASSWORD`.
 3. **Frontend (développement)**
    ```
    cd frontend
    npm install
    npm run dev               -> http://localhost:5173
    ```
+
+## Déploiement Render + Supabase
+- Type de service : Web Service Render
+- Racine : `backend`
+- Build command : `npm install`
+- Start command : `node server.js`
+- Variables : `DB_DRIVER=postgres`, `DATABASE_URL`, `PGSSL=true`, `JWT_SECRET`, `FRONT_URL`, `CORS_ORIGIN`
+- Si Render ne connecte pas à Supabase en IPv6 : utiliser le pooler partagé IPv4 ou activer l’IPv4 dédiée dans Supabase.
+- Exemple de `DATABASE_URL` compatible Render via pooler partagé :
+  ```env
+  DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@aws-0-eu-west-3.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require
+  ```
+- Exemple de `DATABASE_URL` directe :
+  ```env
+  DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.lleaesmkcfolvstekyak.supabase.co:5432/postgres
+  ```
 
 ## Mode cérémonie (un seul processus, sans internet)
 ```

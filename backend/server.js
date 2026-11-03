@@ -24,12 +24,19 @@ const isAllowedOrigin = origin => {
   if (!origin) return true;
   if (FRONT.includes(origin)) return true;
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
-  if (/^https:\/\/.*\.(netlify\.app|vercel\.app)$/i.test(origin)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)*(netlify\.app|vercel\.app)(:\d+)?$/i.test(origin)) return true;
   return false;
+};
+const corsOptions = {
+  origin: (origin, callback) => callback(null, isAllowedOrigin(origin)),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 const io = new Server(server, { cors: { origin: (origin, callback) => callback(null, isAllowedOrigin(origin)) } });
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
-app.use(cors({ origin: (origin, callback) => callback(null, isAllowedOrigin(origin)), credentials: true }));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '50kb' }));
 
 const limitLogin = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Trop de tentatives, réessayez dans 15 minutes' } });
@@ -504,5 +511,11 @@ ensureSchema()
   .then(() => server.listen(PORT, () => console.log('Parrainage UAC : http://localhost:' + PORT)))
   .catch(error => {
     console.error('Échec de préparation de la base de données :', error.message);
+    const isNetReach = error && (error.code === 'ENETUNREACH' || /ENETUNREACH|EAI_AGAIN|ECONNREFUSED/i.test(String(error.message)));
+    if (isNetReach) {
+      console.error('Diagnostique Render/Supabase : la connexion directe est probablement en IPv6.');
+      console.error('Utilisez une DB_URL IPv4 compatible (pooler partagé ou activez l\'IPv4 dédiée dans Supabase).');
+      console.error('Exemple : postgresql://postgres:YOUR_PASSWORD@aws-0-eu-west-3.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require');
+    }
     process.exitCode = 1;
   });
