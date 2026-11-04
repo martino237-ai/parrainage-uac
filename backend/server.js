@@ -97,17 +97,26 @@ async function eligibles(c, camp, ignoreCoupleId = null) {
       (SELECT COUNT(*) FROM couples k WHERE k.parrain_id = p.id AND k.statut = 'valide') nb
     FROM participants p WHERE p.role = 'parrain' AND p.dossier = 'valide' AND p.present = TRUE
       AND (SELECT COUNT(*) FROM couples k WHERE k.parrain_id = p.id AND k.statut = 'valide') < ?`, [camp.capacite_parrain]);
-  const [fils] = await c.query(`SELECT p.id, p.nom, p.filiere, p.niveau FROM participants p
-    WHERE p.role = 'filleul' AND p.dossier = 'valide' AND p.present = TRUE
-      AND NOT EXISTS (SELECT 1 FROM couples k WHERE k.filleul_id = p.id
-        AND k.statut IN ('propose', 'valide') AND (? IS NULL OR k.id <> ?))`, [ignoreCoupleId, ignoreCoupleId]);
+
+  const filsSql = ignoreCoupleId == null
+    ? `SELECT p.id, p.nom, p.filiere, p.niveau FROM participants p
+        WHERE p.role = 'filleul' AND p.dossier = 'valide' AND p.present = TRUE
+          AND NOT EXISTS (SELECT 1 FROM couples k WHERE k.filleul_id = p.id AND k.statut IN ('propose', 'valide'))`
+    : `SELECT p.id, p.nom, p.filiere, p.niveau FROM participants p
+        WHERE p.role = 'filleul' AND p.dossier = 'valide' AND p.present = TRUE
+          AND NOT EXISTS (SELECT 1 FROM couples k WHERE k.filleul_id = p.id
+            AND k.statut IN ('propose', 'valide') AND k.id <> ?)`;
+  const [fils] = ignoreCoupleId == null
+    ? await c.query(filsSql)
+    : await c.query(filsSql, [ignoreCoupleId]);
+
   return { pars, fils };
 }
 const norm = s => s.trim().toLowerCase();
 const compat = (p, f, camp) =>
   (!camp.niveau_superieur || rank(p.niveau) > rank(f.niveau)) &&
   (!camp.meme_filiere || norm(p.filiere) === norm(f.filiere));
-const pick = a => a[crypto.randomInt(a.length)];
+const pick = a => (Array.isArray(a) && a.length ? a[crypto.randomInt(a.length)] : null);
 // Équité : tant que des parrains n'ont aucun filleul (ou moins que les autres), ils passent en premier.
 const moinsServis = a => { const m = Math.min(...a.map(p => p.nb)); return a.filter(p => p.nb === m); };
 
@@ -115,7 +124,10 @@ function tirer(pars, fils, camp) {
   const pp = pars.filter(p => fils.some(f => compat(p, f, camp)));
   if (!pp.length) return null;
   const p = pick(moinsServis(pp));
-  return { p, f: pick(fils.filter(f => compat(p, f, camp))) };
+  if (!p) return null;
+  const admissibles = fils.filter(f => compat(p, f, camp));
+  if (!admissibles.length) return null;
+  return { p, f: pick(admissibles) };
 }
 const enAttente = async c => (await c.query("SELECT * FROM couples WHERE statut = 'propose'"))[0][0];
 const propositionSuspendue = async c => (await c.query("SELECT * FROM couples WHERE statut = 'suspendu' ORDER BY id DESC LIMIT 1"))[0][0];
