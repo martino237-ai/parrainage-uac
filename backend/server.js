@@ -147,7 +147,7 @@ app.get('/api/campagne', wrap(async (q, res) => {
 }));
 app.get('/api/projection', wrap(async (q, res) => res.json(await etat())));
 
-const MAX_PHOTO_BYTES = 300 * 1024;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } });
 const inscSchema = z.object({
   role: z.enum(['parrain', 'filleul']),
@@ -162,10 +162,14 @@ const mimeOf = b => {
   if (b.length > 8 && b.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47]))) return 'image/png';
   return null;
 };
+const isDuplicateKeyError = e => {
+  if (!e) return false;
+  return e.code === 'ER_DUP_ENTRY' || e.code === '23505' || /duplicate key|unique constraint/i.test(String(e.message || ''));
+};
 
 app.post('/api/inscription', limitInsc,
   (req, res, next) => upload.single('photo')(req, res, e => e
-    ? next(new HttpError(400, e.code === 'LIMIT_FILE_SIZE' ? 'Photo trop lourde (300 Ko maximum après compression)' : 'Photo invalide'))
+    ? next(new HttpError(400, e.code === 'LIMIT_FILE_SIZE' ? 'La photo dépasse 10 Mo. Choisissez une image plus petite.' : 'Photo invalide'))
     : next()),
   wrap(async (req, res) => {
     const p = inscSchema.safeParse(req.body);
@@ -174,18 +178,23 @@ app.post('/api/inscription', limitInsc,
     if (!req.file) throw new HttpError(400, 'Photo obligatoire');
     const mime = mimeOf(req.file.buffer);
     if (!mime) throw new HttpError(400, 'La photo doit être au format JPEG ou PNG');
+    const matricule = d.matricule.toUpperCase();
     try {
       await tx(async c => {
         const camp = await getCampagne(c);
         if (camp.phase !== 'inscriptions') throw new HttpError(403, 'Les inscriptions sont fermées');
         if (camp.niveau_superieur && d.role === 'parrain' && d.niveau === 'L1') throw new HttpError(400, 'Un parrain doit être au moins en L2');
         if (camp.niveau_superieur && d.role === 'filleul' && d.niveau === 'M2') throw new HttpError(400, 'Un filleul ne peut pas être en M2');
+
+        const [rows] = await c.query('SELECT id FROM participants WHERE matricule = ? LIMIT 1', [matricule]);
+        if (rows[0]) throw new HttpError(409, 'Ce matricule est déjà inscrit');
+
         const [result] = await c.query(`INSERT INTO participants (role, nom, matricule, filiere, niveau, telephone, photo, photo_mime)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [d.role, d.nom, d.matricule.toUpperCase(), d.filiere, d.niveau, d.telephone, req.file.buffer, mime]);
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [d.role, d.nom, matricule, d.filiere, d.niveau, d.telephone, req.file.buffer, mime]);
         await audit(c, null, 'participant.inscription', 'participant', result.insertId, null, { role: d.role });
       });
     } catch (e) {
-      if (e.code === 'ER_DUP_ENTRY') throw new HttpError(409, 'Ce matricule est déjà inscrit');
+      if (isDuplicateKeyError(e)) throw new HttpError(409, 'Ce matricule est déjà inscrit');
       throw e;
     }
     res.status(201).json({ ok: true });
@@ -299,7 +308,7 @@ app.patch('/api/admin/participants/:id/dossier', auth, wrap(async (req, res) => 
   await tx(async c => {
     if (['pointage', 'ceremonie', 'termine'].includes((await getCampagne(c)).phase)) throw new HttpError(409, 'La validation des dossiers est terminée');
     if (await dejaCouple(c, id)) throw new HttpError(409, 'Cette personne est déjà dans un couple');
-    const [r] = await c.query(`UPDATE participants SET dossier = ?, motif_rejet = ?, present = CASE WHEN ? = 'valide' THEN present ELSE 0 END
+    const [r] = await c.query(`UPDATE participants SET dossier = ?, motif_rejet = ?, present = CASE WHEN ? = 'valide' THEN present ELSE FALSE END
       WHERE id = ?`, [p.data.dossier, p.data.dossier === 'rejete' ? p.data.motif : null, p.data.dossier, id]);
     if (!r.affectedRows) throw new HttpError(404, 'Introuvable');
     await audit(c, req.admin.id, 'participant.dossier.' + p.data.dossier, 'participant', id,
@@ -318,7 +327,7 @@ app.patch('/api/admin/participants/:id/present', auth, wrap(async (req, res) => 
     if (row.dossier !== 'valide') throw new HttpError(409, "Dossier non validé");
     if (!p.data.present && await dejaCouple(c, id)) throw new HttpError(409, 'Déjà dans un couple : utilisez « absent » dans le tirage ou annulez le couple');
     if (Boolean(row.present) !== p.data.present) {
-      await c.query('UPDATE participants SET present = ? WHERE id = ?', [+p.data.present, id]);
+      await c.query('UPDATE participants SET present = ? WHERE id = ?', [p.data.present, id]);
       await audit(c, req.admin.id, p.data.present ? 'participant.presence.present' : 'participant.presence.absent',
         'participant', id, null, { avant: Boolean(row.present), apres: p.data.present });
     }

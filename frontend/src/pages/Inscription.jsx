@@ -20,6 +20,8 @@ const FILIERES = [
   'Autre'
 ];
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 async function compresser(file) {
   const img = await createImageBitmap(file);
   const s = Math.min(1, 1000 / Math.max(img.width, img.height));
@@ -29,11 +31,11 @@ async function compresser(file) {
   const context = c.getContext('2d');
   if (!context) throw new Error('Impossible de traiter cette photo');
   context.drawImage(img, 0, 0, c.width, c.height);
-  for (let q = 0.85; q >= 0.3; q -= 0.1) {
+  for (let q = 0.9; q >= 0.35; q -= 0.1) {
     const b = await new Promise(resolve => c.toBlob(resolve, 'image/jpeg', q));
-    if (b && b.size <= 300 * 1024) return b;
+    if (b && b.size <= MAX_IMAGE_BYTES) return b;
   }
-  throw new Error('Impossible de compresser cette photo sous 300 Ko. Choisissez une image moins détaillée.');
+  throw new Error('Impossible de compresser cette photo sous 10 Mo. Choisissez une image plus légère ou plus petite.');
 }
 
 function BrandMark() {
@@ -93,7 +95,7 @@ export default function Inscription() {
   async function choisir(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_IMAGE_BYTES) {
       setBlob(null);
       setPrev('');
       setMsg('La photo d’origine dépasse 10 Mo. Choisissez un fichier plus léger.');
@@ -290,7 +292,7 @@ export default function Inscription() {
                       </select>
                     </label>
                     <label className="enroll-field enroll-field-wide enroll-photo-field">
-                      <span>Votre photo de profil <small>JPG ou PNG · 300 Ko après compression</small></span>
+                      <span>Votre photo de profil <small>JPG ou PNG · jusqu’à 10 Mo</small></span>
                       <input type="file" accept="image/jpeg,image/png" onChange={choisir} aria-label="Choisir une photo de profil" />
                       {prev ? <img className="enroll-photo-preview" src={prev} alt="Aperçu de votre photo de profil" /> : <span className="enroll-photo-hint"><span aria-hidden="true">＋</span> Ajouter une photo</span>}
                     </label>

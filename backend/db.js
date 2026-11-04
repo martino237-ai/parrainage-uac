@@ -5,9 +5,17 @@ const usePostgres = !!(process.env.DB_DRIVER === 'postgres' || process.env.DATAB
 function buildPgResult(sql, result) {
   const rows = Array.isArray(result?.rows) ? result.rows : [];
   const fields = Array.isArray(result?.fields) ? result.fields : [];
+  const isSelect = /^\s*SELECT\b/i.test(sql);
+  if (isSelect) return [rows, fields];
+
+  const rowCount = Number(result?.rowCount ?? rows.length ?? 0);
+  const payload = { rowCount, affectedRows: rowCount, rows };
+
   const hasInsertId = /\s*INSERT\s+INTO\s+/i.test(sql);
-  const insertId = hasInsertId && rows[0] && typeof rows[0].id !== 'undefined' ? Number(rows[0].id) : undefined;
-  const payload = hasInsertId ? { rowCount: result.rowCount ?? 0, affectedRows: result.rowCount ?? 0, insertId, rows } : rows;
+  if (hasInsertId && rows[0] && typeof rows[0].id !== 'undefined') {
+    payload.insertId = Number(rows[0].id);
+  }
+
   return [payload, fields];
 }
 
