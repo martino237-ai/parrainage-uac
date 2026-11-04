@@ -95,10 +95,10 @@ io.on('connection', async s => { try { s.emit('etat', await etat()); } catch { /
 async function eligibles(c, camp, ignoreCoupleId = null) {
   const [pars] = await c.query(`SELECT p.id, p.nom, p.filiere, p.niveau,
       (SELECT COUNT(*) FROM couples k WHERE k.parrain_id = p.id AND k.statut = 'valide') nb
-    FROM participants p WHERE p.role = 'parrain' AND p.dossier = 'valide' AND p.present = 1
+    FROM participants p WHERE p.role = 'parrain' AND p.dossier = 'valide' AND p.present = TRUE
       AND (SELECT COUNT(*) FROM couples k WHERE k.parrain_id = p.id AND k.statut = 'valide') < ?`, [camp.capacite_parrain]);
   const [fils] = await c.query(`SELECT p.id, p.nom, p.filiere, p.niveau FROM participants p
-    WHERE p.role = 'filleul' AND p.dossier = 'valide' AND p.present = 1
+    WHERE p.role = 'filleul' AND p.dossier = 'valide' AND p.present = TRUE
       AND NOT EXISTS (SELECT 1 FROM couples k WHERE k.filleul_id = p.id
         AND k.statut IN ('propose', 'valide') AND (? IS NULL OR k.id <> ?))`, [ignoreCoupleId, ignoreCoupleId]);
   return { pars, fils };
@@ -216,7 +216,7 @@ app.get('/api/admin/stats', auth, wrap(async (q, res) => {
   const [r] = await pool.query(`SELECT role, COUNT(*) total,
     SUM(CASE WHEN dossier = 'valide' THEN 1 ELSE 0 END) valides,
     SUM(CASE WHEN dossier = 'en_attente' THEN 1 ELSE 0 END) attente,
-    SUM(CASE WHEN dossier = 'valide' AND present = 1 THEN 1 ELSE 0 END) presents
+    SUM(CASE WHEN dossier = 'valide' AND present = TRUE THEN 1 ELSE 0 END) presents
     FROM participants GROUP BY role`);
   const out = { parrain: { total: 0, valides: 0, attente: 0, presents: 0 }, filleul: { total: 0, valides: 0, attente: 0, presents: 0 } };
   r.forEach(x => { out[x.role] = { total: +x.total, valides: +x.valides, attente: +x.attente, presents: +x.presents }; });
@@ -256,13 +256,13 @@ app.put('/api/admin/campagne', auth, wrap(async (req, res) => {
       if (to > from && camp.phase === 'ceremonie' && (await enAttente(c) || await propositionSuspendue(c)))
         throw new HttpError(409, 'Terminez ou reprenez la proposition en cours avant de changer de phase');
       if (d.phase === 'ceremonie') {
-        const [rows] = await c.query("SELECT role, COUNT(*) n FROM participants WHERE dossier = 'valide' AND present = 1 GROUP BY role");
+        const [rows] = await c.query("SELECT role, COUNT(*) n FROM participants WHERE dossier = 'valide' AND present = TRUE GROUP BY role");
         const m = Object.fromEntries(rows.map(r => [r.role, r.n]));
         if (!m.parrain || !m.filleul) throw new HttpError(409, 'Il faut au moins un parrain et un filleul présents');
       }
     }
     const sets = [], vals = [];
-    for (const k of ['phase', ...regles]) if (d[k] !== undefined) { sets.push(`${k} = ?`); vals.push(typeof d[k] === 'boolean' ? +d[k] : d[k]); }
+    for (const k of ['phase', ...regles]) if (d[k] !== undefined) { sets.push(`${k} = ?`); vals.push(d[k]); }
     if (sets.length) {
       await c.query(`UPDATE campagne SET ${sets.join(', ')} WHERE id = 1`, vals);
       await audit(c, req.admin.id, d.phase && d.phase !== camp.phase ? 'campagne.phase' : 'campagne.regles',
@@ -389,7 +389,7 @@ app.post('/api/admin/tirage/absent', auth, wrap(async (req, res) => {
     const camp = await getCampagne(c); exigerCeremonie(camp);
     const k = await enAttente(c);
     if (!k) throw new HttpError(409, 'Aucun couple en cours');
-    await c.query('UPDATE participants SET present = 0 WHERE id = ?', [qui === 'parrain' ? k.parrain_id : k.filleul_id]);
+    await c.query('UPDATE participants SET present = FALSE WHERE id = ?', [qui === 'parrain' ? k.parrain_id : k.filleul_id]);
     await log(c, 'absent_' + qui, k.parrain_id, k.filleul_id);
     await audit(c, req.admin.id, 'couple.absence.' + qui, 'couple', k.id, motif,
       { parrain_id: k.parrain_id, filleul_id: k.filleul_id });
